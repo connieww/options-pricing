@@ -1,9 +1,11 @@
 """Validation tests for the pricing models."""
 
+
 import numpy as np
 from pricers.black_scholes import bs_call, bs_put
+from pricers.monte_carlo import mc_call, mc_put      
 
-
+#base tests for the black scholes pricer
 def test_put_call_parity():
     """C - P = S - K*exp(-rT). Pure no-arbitrage, must hold in any model."""
     S, K, r, sigma, T = 100, 100, 0.05, 0.2, 1.0
@@ -40,3 +42,18 @@ def test_zero_volatility_is_discounted_intrinsic():
     price = bs_call(100, 90, 0.05, 1e-9, 1.0)
     expected = max(100 - 90 * np.exp(-0.05), 0)
     assert abs(price - expected) < 0.01
+
+#tests for the monte carlo pricer
+def test_mc_matches_bs():
+    """MC should land within 3 standard errors of the exact price."""
+    price, se = mc_call(100, 100, 0.05, 0.2, 1.0, n_paths=200_000, seed=42)
+    exact = bs_call(100, 100, 0.05, 0.2, 1.0)
+    assert abs(price - exact) < 3 * se
+
+
+def test_mc_standard_error_shrinks():
+    """Quadrupling paths should roughly halve the standard error (1/sqrt(N))."""
+    _, se_small = mc_call(100, 100, 0.05, 0.2, 1.0, n_paths=10_000, seed=1)
+    _, se_large = mc_call(100, 100, 0.05, 0.2, 1.0, n_paths=40_000, seed=1)
+    ratio = se_small / se_large
+    assert 1.7 < ratio < 2.3
