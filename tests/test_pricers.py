@@ -3,7 +3,8 @@
 
 import numpy as np
 from pricers.black_scholes import bs_call, bs_put
-from pricers.monte_carlo import mc_call, mc_put      
+from pricers.monte_carlo import mc_call, mc_put    
+from pricers.binomial import binomial_call, binomial_put  
 
 #base tests for the black scholes pricer
 def test_put_call_parity():
@@ -57,3 +58,25 @@ def test_mc_standard_error_shrinks():
     _, se_large = mc_call(100, 100, 0.05, 0.2, 1.0, n_paths=40_000, seed=1)
     ratio = se_small / se_large
     assert 1.7 < ratio < 2.3
+
+def test_american_put_ge_european():
+    """Early exercise is an extra right, so it can only add value."""
+    euro = binomial_put(100, 100, 0.05, 0.2, 1.0, N=500, american=False)
+    amer = binomial_put(100, 100, 0.05, 0.2, 1.0, N=500, american=True)
+    assert amer >= euro
+
+
+def test_american_call_equals_european_without_dividends():
+    """
+    With no dividends it is never optimal to exercise a call early,
+    so the American call equals the European one.
+    """
+    euro = binomial_call(100, 100, 0.05, 0.2, 1.0, N=500, american=False)
+    amer = binomial_call(100, 100, 0.05, 0.2, 1.0, N=500, american=True)
+    assert abs(amer - euro) < 1e-10
+
+
+def test_binomial_converges_to_bs():
+    """Tree price should approach the closed form as steps increase."""
+    price = binomial_call(100, 100, 0.05, 0.2, 1.0, N=2000)
+    assert abs(price - bs_call(100, 100, 0.05, 0.2, 1.0)) < 0.005
